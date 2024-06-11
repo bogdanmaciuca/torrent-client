@@ -1,8 +1,6 @@
 /*
 TODO:
-- conversion operators
-- [] operator
-- error handling
+- parser error handling: longer strings than should be
 */
 
 #include <iostream>
@@ -28,9 +26,12 @@ int main(int argc, char** argv) {
 	}
 	std::string contents = ReadFile(argv[1]);
 	
-	Node tree;
-	Parser parser(tree, contents);
-	std::cout << tree.Dct()["url-list"]->Lst()[0]->Str();
-	CurlWrapper curl;
+	Parser parser(contents);
+	if (!parser.Success()) return -1;
 
+	std::string url = parser.root->Dct()["announce"]->Str();
+	std::cout << parser.root->Dct()["info"]->Dct()["pieces"]->Str();
+
+	CurlWrapper curl;
+	//curl.MakeRequest()
 }
