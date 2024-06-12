@@ -5,28 +5,87 @@
 #include <variant>
 
 template<class T>
-using Dict = std::unordered_map<std::string, T*>;
+using Dict = std::unordered_map<std::string, T>;
 template<class T>
-using List = std::vector<T*>;
+using List = std::vector<T>;
+using uchar = unsigned char;
+using String = std::basic_string<uchar>;
+
+String ToBasStr(long int num) {
+	String result;
+	while (num) {
+		result.insert(result.begin(), num%10 + '0');
+		num = num / 10;
+	}
+	return result;
+}
+String ToBasStr(const std::string& str) {
+	String result;
+	for (auto c: str)
+		result += (uchar)c;
+	return result;
+}
+std::string ToStr(const String& basicString) {
+	std::string result;
+	for (auto c: basicString)
+		result += (char)c;
+	return result;
+}
+std::string StrHead(const std::string& s, int maxLen) {
+	if (s.size() > maxLen)
+		return s.substr(0, maxLen);
+	return s;
+}
+
+struct Node;
+struct OrderedDict {
+	Dict<Node*> dict;
+	List<std::string> ordered;
+};
 
 enum NodeType {
 	NUMBER, STRING, DICT, LIST
 };
 struct Node {
-	std::variant<long int, std::string, Dict<Node>, List<Node>> value;
+	std::variant<long long, String, OrderedDict, List<Node*>> value;
 
-	long int& Num() { return std::get<NUMBER>(value); }
-	std::string& Str() { return std::get<STRING>(value); }
-	Dict<Node>& Dct() { return std::get<DICT>(value); }
-	List<Node>& Lst() { return std::get<LIST>(value); }
+	long long& Num() { return std::get<NUMBER>(value); }
+	String& Str() { return std::get<STRING>(value); }
+	Dict<Node*> Dct() { return (std::get<DICT>(value)).dict; }
+	OrderedDict& _Dct() { return std::get<DICT>(value); }
+	List<Node*>& Lst() { return std::get<LIST>(value); }
 	NodeType Type() { return (NodeType)value.index(); }
+
+	String Print() {
+		switch(Type()) {
+			case NUMBER: return ToBasStr("i") + ToBasStr(Num()) + ToBasStr("e"); break;
+			case STRING: return ToBasStr(Str().size()) + ToBasStr(":") + Str();
+			case DICT: {
+				String result((uchar*)"d");
+				for (auto& e: _Dct().ordered) {
+					Node* n = Dct()[e];
+					result += ToBasStr(e.size()) + ToBasStr(":") + ToBasStr(e) + n->Print();
+				}
+				result += 'e';
+				return result;
+			} break;
+			case LIST: {
+				String result = (uchar*)"l";
+				for (auto& e: Lst())
+					result += e->Print();
+				result += 'e';
+				return result;
+			}
+		}
+		return (uchar*)"{ERROR_TYPE}";
+	}
 };
 
 class Parser {
 public:
 	Node *root;
-	Parser(std::string data)
-		: data((char*)data.c_str()), dataLen(data.size()) {
+	Parser(const char* data, int dataLen)
+		: data((char*)data), dataLen(dataLen) {
 		try {
 			root = ParseDict();
 		} catch (std::exception e) {
@@ -40,7 +99,7 @@ public:
 	bool Success() { return success; }
 private:
 	char* data;
-	int dataLen;
+	long long dataLen;
 	int i = 0;
 	bool success = true;
 
@@ -48,12 +107,12 @@ private:
 		Node *node = new Node();
 		switch(data[i]) {
 		case 'd': node = ParseDict(); break;
-		case '1': case '2': case '3': case '4':
+		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9': node = ParseString(); break;
 		case 'i': node = ParseInt(); break;
 		case 'l': node = ParseList(); break;
 		default:
-			std::cout << "Unexpected character: '" << data[i] << "'.\n";
+			std::cout << "Unexpected character: '" << data[i] << "' in '" << data[i-1] << data[i] << data[i+1] << "'.\n";
 			throw std::exception();
 			break;
 		}
@@ -66,7 +125,7 @@ private:
 		}
 		int len = std::stoi(lenStr);
 		Expect(':');
-		std::string value;
+		String value;
 		for (int j = 0; j < len; j++)
 			value += data[i++];
 		Node *node = new Node();
@@ -80,13 +139,13 @@ private:
 			numStr += data[i++]; // TODO: Check for non-digit characters
 		Expect('e');
 		Node *node = new Node();
-		node->value = std::stol(numStr);
+		node->value = std::stoll(numStr);
 		return node;
 	}
 	Node* ParseList() {
 		i++; // 'l'
 		Node *node = new Node();
-		node->value = List<Node>();
+		node->value = List<Node*>();
 		while (data[i] != 'e')
 			node->Lst().push_back(ParseNode());
 		Expect('e');
@@ -95,10 +154,11 @@ private:
 	Node* ParseDict() {
 		i++; // 'd'
 		Node *node = new Node();
-		node->value = Dict<Node>();
+		node->value = OrderedDict();
 		while (data[i] != 'e') {
-			std::string s = ParseString()->Str();
-			node->Dct()[s] = ParseNode();
+			std::string s = ToStr(ParseString()->Str());
+			node->_Dct().ordered.push_back(s);
+			node->_Dct().dict[s] = ParseNode();
 		}
 		Expect('e');
 		return node;
