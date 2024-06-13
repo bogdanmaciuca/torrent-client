@@ -1,7 +1,14 @@
 /*
 TODO:
+- use ASIO instead of libcurl
+- support more types of torrents (different structures)
 - parser error handling: longer strings than should be
 */
+
+#define ASIO_STANDALONE
+#ifdef _WIN32
+#define _WIN32_WINNT 0x0A00
+#endif
 
 #include <iostream>
 #include <string>
@@ -9,8 +16,10 @@ TODO:
 #include <fstream>
 #include <random>
 #include "include/openssl/sha.h"
+#include "include/asio.hpp"
+#include "include/asio/ts/buffer.hpp"
+#include "include/asio/ts/internet.hpp"
 #include "parser.hpp"
-#include "request.hpp"
 
 std::string ReadFile(const char* filename) {
 	std::ifstream file(filename, std::ios::binary);
@@ -91,9 +100,34 @@ int main(int argc, char** argv) {
 		"&downloaded=0&compact=1" +
 		"&left=" + std::to_string(piecesLen);
 
-	CurlWrapper curl;
-	curl.MakeRequest(url.c_str());
+	asio::error_code asioErr;
+	asio::io_context asioContext;
+	asio::io_service ioService;
+	asio::ip::tcp::resolver resolver(ioService);
+	asio::ip::tcp::resolver::query query("example.com", "80");
+	asio::ip::tcp::resolver::iterator iter = resolver.resolve(query);
 
-	parser = Parser(curl.GetData().memory, curl.GetData().size);
-	auto ipList = GetIPs(parser.root->Dct()["peers"]->Str());
+	asio::ip::tcp::endpoint endpoint = iter->endpoint();
+	//asio::ip::tcp::endpoint endpoint(asio::ip::make_address("https://example.com/", asioErr), 80);
+	asio::ip::tcp::socket socket(asioContext);
+
+	socket.connect(endpoint, asioErr);
+
+	if (asioErr)
+		std::cout << "Connection failed: " << asioErr.message();
+	
+	if (socket.is_open()) {
+		std::string request =
+			"GET /index.html HTTP/1.1\r\n"
+			"Host: example.com\r\n"
+			"Connection: close\r\n\r\n";
+		socket.write_some(asio::buffer(request.data(), request.size()), asioErr);
+		socket.wait(socket.wait_read);
+		int bytes = socket.available();
+		if (bytes > 0) {
+			List<char> buffer(bytes);
+			socket.read_some(asio::buffer(buffer.data(), buffer.size()), asioErr);
+			std::cout << buffer.data() << "\n";
+		}
+	}
 }
