@@ -11,11 +11,11 @@ std::string ReadFile(const char* filename) {
   return sstr.str();
 }
 
-std::string UrlEncode(uchar* bytes, int size) {
+std::string UrlEncode(unsigned char* bytes, int size) {
   static const char* base = "0123456789abcdef";
   std::string result;
   for (int i = 0; i < size; i++) {
-    uchar byte = bytes[i];
+    unsigned char byte = bytes[i];
     result += '%';
     result += base[(byte/16)%16];
     result += base[byte%16];
@@ -23,13 +23,13 @@ std::string UrlEncode(uchar* bytes, int size) {
   return result;
 }
 
-std::string GetInfoHash(const String& infoDict) {
-	uchar sha1HashBytes[SHA_DIGEST_LENGTH];
-	SHA1(infoDict.data(), infoDict.size(), sha1HashBytes);
+std::string GetInfoHash(const std::string& infoDict) {
+	unsigned char sha1HashBytes[SHA_DIGEST_LENGTH];
+	SHA1((unsigned char*)infoDict.data(), infoDict.size(), sha1HashBytes);
 	return UrlEncode(sha1HashBytes, SHA_DIGEST_LENGTH);
 }
 
-List<std::string> GetIPs(String str) {
+List<std::string> GetIPs(std::string str) {
 	List<std::string> result;
 	for (int i = 0; i < str.size(); i += 6) {
 		std::string ip;
@@ -57,8 +57,3 @@ std::string RandomString(int len) {
 	return result;
 }
 
-void GetDomainAndPort(
-  const std::string& url, std::string &domain, int &port
-) {
-  
-}
