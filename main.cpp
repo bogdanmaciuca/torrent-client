@@ -1,9 +1,7 @@
 
 /*
   TODO:
-  - use ASIO instead of libcurl:
-	  - parse url to get domain and port
-	- refactor the while string/basic string thing
+  - parse tracker response
   - support more types of torrents (different structures)
   - parser error handling: longer strings than should be
 */
@@ -32,14 +30,14 @@ int main(int argc, char** argv) {
 
   Parser parser(contents.c_str(), contents.size());
   if (!parser.Success()) return -1;
-	
+  
   std::string trackerUrl = parser.root->Dct()["announce"]->Str();
-	std::string infoDict = parser.root->Dct()["info"]->Print();
+  std::string infoDict = parser.root->Dct()["info"]->Print();
   std::string infoHash = GetInfoHash(infoDict);
   std::string peerID = RandomString(20);
   int port = 6883; // TODO
   long long piecesLen = parser.root->Dct()["info"]->Dct()["length"]->Num();
-	
+  
   std::string args =
     "?info_hash=" + infoHash +
     "&peer_id=" + peerID +
@@ -47,12 +45,19 @@ int main(int argc, char** argv) {
     "&downloaded=0&compact=1" +
     "&left=" + std::to_string(piecesLen);
 
-	Networking networking;
-	Networking::Endpoint endpoint = networking.GetEndpoint(trackerUrl);
-	std::vector<char> response;
-	networking.MakeGetReq(endpoint, args, response);
+  Networking networking;
+  Networking::Endpoint endpoint = networking.GetEndpoint(trackerUrl);
+  std::vector<char> response;
+  networking.MakeGetReq(endpoint, args, response);
 
-	for (int i = 0; i < response.size(); i++)
-		std::cout << response[i];
-	std::cout << "\n";
+  response = Networking::GetBody(response);
+  for (int i = 0; i < response.size(); i++)
+    std::cout << response[i];
+  std::cout << "\n";
+
+  parser = Parser(response.data(), response.size());
+  std::string ipBlob = parser.root->Dct()["peers"]->Str();
+  auto peersIPs = GetIPs(ipBlob);
+  for (int i = 0; i < peersIPs.size(); i++)
+    std::cout << peersIPs[i].ip << ":" << peersIPs[i].port << "\n";
 }

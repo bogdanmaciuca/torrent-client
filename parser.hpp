@@ -95,6 +95,7 @@ private:
     while (isdigit(data[i])) {
       lenStr += data[i++];
     }
+    //std::cout << "ParseString(): " << data[i] << data[i+1] << data[i+2] << "\n";
     int len = std::stoi(lenStr);
     Expect(':');
 		std::string value;

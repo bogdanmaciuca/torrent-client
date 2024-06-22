@@ -29,20 +29,21 @@ std::string GetInfoHash(const std::string& infoDict) {
 	return UrlEncode(sha1HashBytes, SHA_DIGEST_LENGTH);
 }
 
-List<std::string> GetIPs(std::string str) {
-	List<std::string> result;
+struct Peer {
+  std::string ip;
+  unsigned short port;
+};
+std::vector<Peer> GetIPs(std::string str) {
+  std::vector<Peer> result;
 	for (int i = 0; i < str.size(); i += 6) {
-		std::string ip;
-		ip += std::to_string(str[i+0]) + '.';
-		ip += std::to_string(str[i+1]) + '.';
-		ip += std::to_string(str[i+2]) + '.';
-		ip += std::to_string(str[i+3]) + ':';
-		int port = 0;
-		port = ((unsigned int)str[i+4] << 2) | str[i+5]; // TODO: how the fuck do we
-		ip += std::to_string(port);
-		result.push_back(ip);
-		std::cout << ip << "\n";
-	}
+    Peer p;
+		p.ip += std::to_string((unsigned char)str[i+0]) + '.';
+    p.ip += std::to_string((unsigned char)str[i+1]) + '.';
+    p.ip += std::to_string((unsigned char)str[i+2]) + '.';
+    p.ip += std::to_string((unsigned char)str[i+3]);
+    p.port = ((unsigned int)(unsigned char)str[i+4] << 2) | (unsigned int)(unsigned char)str[i+5]; // TODO: how the fuck do we
+    result.push_back(p);
+  }
 	return result;
 }
 

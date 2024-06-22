@@ -10,6 +10,20 @@ public:
     asio::ip::tcp::endpoint asioEndpoint;
     std::string domain, path, port;
   };
+  static std::vector<char> GetBody(std::vector<char> response) {
+    int bodyStart = 4;
+    while (
+      (response[bodyStart-1] != '\n' ||
+      response[bodyStart-2] != '\r' ||
+      response[bodyStart-3] != '\n' ||
+      response[bodyStart-4] != '\r') &&
+      bodyStart < response.size()) bodyStart++;
+    if (bodyStart >= response.size()) {
+      std::cout << "GetBody(): could not parse response.\n";
+      return {};
+    }
+    return std::vector(response.begin() + bodyStart, response.end());
+  }
   Endpoint GetEndpoint(std::string url) {
     Endpoint endpoint;
     ParseUrl(url, endpoint.domain, endpoint.port, endpoint.path);
