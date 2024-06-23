@@ -1,7 +1,7 @@
-
 /*
   TODO:
-  - parse tracker response
+  - socket hangs when the it can't connect to the peer
+  - parse tracker response: v6 IPs?
   - support more types of torrents (different structures)
   - parser error handling: longer strings than should be
 */
@@ -13,7 +13,6 @@
 
 #include <iostream>
 #include <string>
-#include <sstream>
 #include <fstream>
 #include <random>
 #include "include/openssl/sha.h"
@@ -39,25 +38,47 @@ int main(int argc, char** argv) {
   long long piecesLen = parser.root->Dct()["info"]->Dct()["length"]->Num();
   
   std::string args =
-    "?info_hash=" + infoHash +
+    "?info_hash=" + UrlEncode(infoHash) +
     "&peer_id=" + peerID +
     "&port=" + std::to_string(port) +
     "&downloaded=0&compact=1" +
     "&left=" + std::to_string(piecesLen);
 
   Networking networking;
-  Networking::Endpoint endpoint = networking.GetEndpoint(trackerUrl);
-  std::vector<char> response;
-  networking.MakeGetReq(endpoint, args, response);
-
-  response = Networking::GetBody(response);
-  for (int i = 0; i < response.size(); i++)
-    std::cout << response[i];
-  std::cout << "\n";
+  Networking::Endpoint trackerEndpoint = networking.GetEndpoint(trackerUrl);
+  std::string response;
+  networking.MakeGetReq(trackerEndpoint, args, response);
+  response = networking.GetBody(response);
 
   parser = Parser(response.data(), response.size());
   std::string ipBlob = parser.root->Dct()["peers"]->Str();
   auto peersIPs = GetIPs(ipBlob);
   for (int i = 0; i < peersIPs.size(); i++)
     std::cout << peersIPs[i].ip << ":" << peersIPs[i].port << "\n";
+
+  std::string handshake;
+  handshake += 19; // Protocol identifier length
+  handshake += "BitTorrent protocol"; // Protocol identifier
+  handshake += std::string(8, 0); // Extension reserved bytes
+  handshake += infoHash; // Info hash
+  handshake += peerID;
+
+  for (int i = 0; i < peersIPs.size(); i++) {
+    Networking::Peer peer(networking, peersIPs[0].ip, peersIPs[0].port);
+    response = peer.Send(handshake);
+    //std::cout << UrlEncode(handshake) << "\n";
+    //std::cout << UrlEncode(response) << "\n";
+    std::string peerInfoHash(response.begin() + 28, response.begin() + 48);
+
+    std::cout << "Peer #" << i << ": ";
+    if (infoHash == peerInfoHash)
+      std::cout << "Info hash matches.\n";
+    else
+      std::cout << "Info hash does not match.\n";
+    }
+  
+
+  //for (int i = 0; i < peersIPs.size(); i++) {
+  //  Networking::Endpoint endpoint = networking.GetEndpoint(peersIPs[i].ip, peersIPs[i].port);
+  //}
 }

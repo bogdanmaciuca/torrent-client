@@ -11,10 +11,10 @@ std::string ReadFile(const char* filename) {
   return sstr.str();
 }
 
-std::string UrlEncode(unsigned char* bytes, int size) {
+std::string UrlEncode(std::string bytes) {
   static const char* base = "0123456789abcdef";
   std::string result;
-  for (int i = 0; i < size; i++) {
+  for (int i = 0; i < bytes.size(); i++) {
     unsigned char byte = bytes[i];
     result += '%';
     result += base[(byte/16)%16];
@@ -24,24 +24,26 @@ std::string UrlEncode(unsigned char* bytes, int size) {
 }
 
 std::string GetInfoHash(const std::string& infoDict) {
-	unsigned char sha1HashBytes[SHA_DIGEST_LENGTH];
-	SHA1((unsigned char*)infoDict.data(), infoDict.size(), sha1HashBytes);
-	return UrlEncode(sha1HashBytes, SHA_DIGEST_LENGTH);
+  std::string sha1HashBytes;
+  sha1HashBytes.resize(SHA_DIGEST_LENGTH);
+	SHA1((unsigned char*)infoDict.data(), infoDict.size(), (unsigned char*)sha1HashBytes.data());
+	return sha1HashBytes;
 }
 
-struct Peer {
+struct PeerAddr {
   std::string ip;
   unsigned short port;
 };
-std::vector<Peer> GetIPs(std::string str) {
-  std::vector<Peer> result;
+std::vector<PeerAddr> GetIPs(std::string str) {
+  std::vector<PeerAddr> result;
 	for (int i = 0; i < str.size(); i += 6) {
-    Peer p;
+    PeerAddr p;
 		p.ip += std::to_string((unsigned char)str[i+0]) + '.';
     p.ip += std::to_string((unsigned char)str[i+1]) + '.';
     p.ip += std::to_string((unsigned char)str[i+2]) + '.';
     p.ip += std::to_string((unsigned char)str[i+3]);
-    p.port = ((unsigned int)(unsigned char)str[i+4] << 2) | (unsigned int)(unsigned char)str[i+5]; // TODO: how the fuck do we
+    
+    p.port = ((unsigned char)str[i+4] << 8) | (unsigned char)str[i+5];
     result.push_back(p);
   }
 	return result;
