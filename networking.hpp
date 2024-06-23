@@ -16,12 +16,16 @@ public:
     Peer(Networking& networking, std::string ip, int port) :
       socket(networking.GetAsioContext()) {
       endpoint = asio::ip::tcp::endpoint(asio::ip::make_address(ip), port);
-      socket.connect(endpoint, asioErr);
-      if (asioErr)
-        std::cout << "Could not connect to peer: " << asioErr.message();
-      else
-        std::cout << "Connected to peer.\n";
     }
+    bool Connect() {
+      socket.connect(endpoint, asioErr);
+      if (asioErr) {
+        std::cout << "Could not connect to peer: " << asioErr.message() << "\n";
+        return false;
+      }
+      return true;
+    }
+    bool SocketIsOpen() { return socket.is_open(); }
     // Returns the response or an empty string if the function fails
     std::string Send(std::string data) {
       if (!socket.is_open()) {
