@@ -1,6 +1,8 @@
+#pragma once
 #include <string>
 #include <fstream>
-#include <random>
+#include <ctime>
+#include <cstdlib>
 #include "include/openssl/sha.h"
 
 std::string ReadFile(const char* filename) {
@@ -12,7 +14,7 @@ std::string ReadFile(const char* filename) {
   return sstr.str();
 }
 
-std::string UrlEncode(std::string bytes) {
+std::string UrlEncode(const std::string& bytes) {
   static const char* base = "0123456789abcdef";
   std::string result;
   for (int i = 0; i < bytes.size(); i++) {
@@ -68,12 +70,10 @@ std::vector<PeerAddr> GetIpv6(std::string str) {
 
 std::string RandomString(int len) {
   static const char* alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  static std::random_device dev;
-  static std::mt19937 rng(dev());
-  static std::uniform_int_distribution<std::mt19937::result_type> dist(0, 62);
   std::string result;
+  std::srand(std::time(0));
   for (int i = 0; i < len; i++)
-    result += alphabet[dist(rng)];
+    result += alphabet[std::rand() % 62];
   return result;
 }
 

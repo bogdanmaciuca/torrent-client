@@ -1,6 +1,8 @@
 /*
   TODO:
-  - make it async
+  - make it async:
+    - connect -> send -> recv -> check -> download, in a chain (callbacks)
+  - compile asio header files: https://www.think-async.com/Asio/asio-1.10.6/doc/asio/using.html
   - download data from peer
   - support more types of torrents (different structures)
   - parser error handling: longer strings than should be
@@ -40,6 +42,7 @@ int main(int argc, char** argv) {
     "&port=" + std::to_string(port) +
     "&downloaded=0&compact=1" +
     "&left=" + std::to_string(piecesLen);
+  std::cout << "My peer ID: " << peerID << "\n======\n";
 
   Networking networking;
   Networking::Endpoint trackerEndpoint = networking.GetEndpoint(trackerUrl);
@@ -54,17 +57,6 @@ int main(int argc, char** argv) {
   auto peersIpv6 = GetIpv6(ipv6Blob);
   std::vector<Networking::Peer> peers;
 
-  std::cout << "=== ipv4 peers: ===\n";
-  for (int i = 0; i < peersIpv4.size(); i++) {
-    std::cout << peersIpv4[i].ip << ":" << peersIpv4[i].port << "\n";
-    peers.push_back(Networking::Peer(networking, peersIpv4[i].ip, peersIpv4[i].port));
-  }
-  std::cout << "=== ipv6 peers: ===\n";
-  for (int i = 0; i < peersIpv6.size(); i++) {
-    std::cout << peersIpv6[i].ip << "  " << peersIpv6[i].port << "\n";
-    peers.push_back(Networking::Peer(networking, peersIpv6[i].ip, peersIpv6[i].port));
-  }
-
   std::string handshake;
   handshake += 19; // Protocol identifier length
   handshake += "BitTorrent protocol"; // Protocol identifier
@@ -72,21 +64,33 @@ int main(int argc, char** argv) {
   handshake += infoHash; // Info hash
   handshake += peerID;
 
-  for (int i = 0; i < peers.size(); i++) {
-  //for (int i = 0; i < 2; i++) {
-    if (peers[i].Connect()) {
-      response = peers[i].Send(handshake);
-      std::string peerInfoHash(response.begin() + 28, response.begin() + 48);
+  std::cout << "=== ipv4 peers: ===\n";
+  for (int i = 0; i < peersIpv4.size(); i++) {
+    std::cout << peersIpv4[i].ip << ":" << peersIpv4[i].port << "\n";
+    peers.push_back(Networking::Peer(networking, handshake, peersIpv4[i].ip, peersIpv4[i].port));
+  }
+  std::cout << "=== ipv6 peers: ===\n";
+  for (int i = 0; i < peersIpv6.size(); i++) {
+    std::cout << peersIpv6[i].ip << "  " << peersIpv6[i].port << "\n";
+    peers.push_back(Networking::Peer(networking, handshake, peersIpv6[i].ip, peersIpv6[i].port));
+  }
+  std::cout << "===\n\n";
   
-      std::cout << "Peer #" << i << ": ";
-      if (infoHash == peerInfoHash)
-        std::cout << "Info hash matches.\n";
-      else
-        std::cout << "Info hash does not match.\n";
-    }
-  }  
-  
-  //for (int i = 0; i < peersIPs.size(); i++) {
-  //  Networking::Endpoint endpoint = networking.GetEndpoint(peersIPs[i].ip, peersIPs[i].port);
+
+  for (int i = 0; i < peers.size(); i++)
+    peers[i].Connect();
+  networking.GetAsioContext().run();  
+
+  std::cout << "Finished!\n";
+  //std::vector<std::string> responses(peers.size());
+  //for (int i = 0; i < peers.size(); i++)
+  //  peers[i].Send(handshake, responses[i]);
+  //
+  //for (int i = 0; i < peers.size(); i++) {
+  //  std::string responseInfoDict(responses[i].begin() + 29, responses[i].begin() + 48);
+  //  if (responses[i] == responseInfoDict)
+  //    std::cout << "Info dict matches.\n";
+  //  else
+  //    std::cout << "Info dict does not match.\n";
   //}
 }

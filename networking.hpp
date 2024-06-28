@@ -2,6 +2,7 @@
 #include "include/asio.hpp"
 #include "include/asio/ts/buffer.hpp"
 #include "include/asio/ts/internet.hpp"
+#include "utils.hpp"
 
 class Networking {
 public:
@@ -12,44 +13,55 @@ public:
   struct Peer {
     asio::ip::tcp::endpoint endpoint;
     asio::ip::tcp::socket socket;
-    asio::error_code asioErr;
-    Peer(Networking& networking, std::string ip, int port) :
-      socket(networking.GetAsioContext()) {
+    std::string response;
+    std::string handshake;
+    Peer(Networking& networking, std::string handshake, std::string ip, int port) :
+      socket(networking.GetAsioContext()), handshake(handshake) {
       endpoint = asio::ip::tcp::endpoint(asio::ip::make_address(ip), port);
     }
-    bool Connect() {
-      socket.connect(endpoint, asioErr);
-      if (asioErr) {
-        std::cout << "Could not connect to peer: " << asioErr.message() << "\n";
-        return false;
-      }
-      return true;
+    void Connect() {
+      socket.async_connect(endpoint, [&](asio::error_code err) {
+        std::string peerIp = endpoint.address().to_string();
+        if (err)
+          std::cout << "Could not connect to peer: " << peerIp << "\n"; //<< ": " << err.message() << "\n";
+        else {
+          std::cout << "Connected to peer successfully: " << peerIp << "\n";
+          SendHandshake();
+        }
+      });
     }
-    bool SocketIsOpen() { return socket.is_open(); }
-    // Returns the response or an empty string if the function fails
-    std::string Send(std::string data) {
+    bool SendHandshake() {
       if (!socket.is_open()) {
         std::cout << "Could not send data to peer: socket not open.\n";
-        return "";
+        return false;
       }
-      socket.write_some(asio::buffer(data.data(), data.size()), asioErr);
-      // Wait for the response
-      socket.wait(socket.wait_read);
-      int bytes = socket.available();
-      std::string response;
-      if (bytes > 0) {
-        response.resize(bytes);
-        socket.read_some(asio::buffer(response.data(), bytes), asioErr);
-      }
-      if (asioErr) {
-        std::cout << "Could not read response from peer: " << asioErr.message();
-        return "";
-      }
-      return response;
+      asio::error_code err;
+      socket.async_write_some(
+        asio::buffer(handshake.data(), handshake.size()),
+        [&](asio::error_code err, std::size_t) {
+          if (err) std::cout << "Could not send handshake.\n";
+          else RecvHandshake();
+        }
+      );
+      return true;
     }
+    void RecvHandshake() {
+      response.resize(68); // If the response is more than 68 bytes then it's probably garbage
+      asio::async_read(
+        socket, asio::buffer(response.data(), response.size()),
+        [&](const asio::error_code err, std::size_t) {
+          std::string receivedInfoHash(response.begin() + 28, response.begin() + 47);
+          std::string infoHash(handshake.begin() + 28, handshake.begin() + 47);
+          if (receivedInfoHash == infoHash)
+            std::cout << "Info hash matches!\n";
+          else
+            std::cout << "Info hash doesn't match.\n";
+        }
+      );
+  }     
   };
-  asio::io_context& GetAsioContext() { return m_asioContext; }
   
+  asio::io_context& GetAsioContext() { return m_asioContext; }  
   std::string GetBody(const std::string& response) {
     int bodyStart = 4;
     while (
